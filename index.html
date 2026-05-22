@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Air Quality Dashboard</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+
+<div class="sidebar">
+  <h2>🌍 Quan trắc không khí</h2>
+
+  <div class="menu active" onclick="showTab('dashboard', this)">
+    <i class="fas fa-home"></i> Bảng điều khiển
+  </div>
+
+  <div class="menu" onclick="showTab('history', this)">
+    <i class="fas fa-clock"></i> Lịch sử
+  </div>
+
+  <div class="menu" onclick="showTab('prediction', this)">
+    <i class="fas fa-robot"></i> Dự đoán AI
+  </div>
+
+  <div class="menu" onclick="showTab('logs', this)">
+    <i class="fas fa-bell"></i> Nhật ký & Cảnh báo
+  </div>
+
+  <div class="menu" onclick="showTab('settings', this)">
+    <i class="fas fa-cog"></i> Cài đặt
+  </div>
+</div>
+
+<div class="main">
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="tab-content">
+
+    <div class="header-new-container">
+        <div class="header-gradient-box">
+            <div class="header-left-content">
+                <div class="icon-bg-white">
+                    <i class="fas fa-wind"></i>
+                </div>
+                <div class="title-text-group">
+                    <h1 class="main-title-text">Hệ thống Giám sát & Dự báo chất lượng không khí thông minh (LSTM)</h1>
+                    <p class="sub-title-text">
+                      TRẠM: Hà Nội | 
+                      <span id="status-badge" class="status-offline">● Offline</span> | 
+                      Cập nhật: <span id="last-update">Đang tải...</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="section-title-container">
+        <h2 class="section-title">
+            <span class="title-badge">A</span>
+            CHỈ SỐ THỜI GIAN THỰC (REAL-TIME)
+        </h2>
+    </div>
+
+    <div class="aqi-section-grid">
+      <!-- CỘT TRÁI: Hiển thị AQI (Chiếm 50% chiều rộng) -->
+      <div id="aqi"></div>
+      <!-- CỘT PHẢI: Chứa 2 card nhỏ xếp chồng (Chiếm 50% chiều rộng) -->
+      <div class="advice-column">
+        <!-- 1. Card Khuyến nghị sức khỏe -->
+        <div class="advice-card">
+          <div class="advice-content">
+              <div class="advice-header">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                  <span>Cảnh báo & Khuyến nghị sức khỏe</span>
+              </div>
+              <h3 id="health-advice-main">Hiện tại không có cảnh báo nguy hiểm.</h3>
+              <p id="health-advice-sub">Hãy duy trì thói quen tốt: hạn chế ra ngoài khi chỉ số AQI cao và sử dụng máy lọc không khí ở chế độ phù hợp.</p>
+          </div>
+
+          <div class="advice-visual">
+              <div class="shield-wrapper">
+                  <i class="fa-solid fa-shield-halved shield-bg"></i>
+                  <i class="fa-solid fa-check shield-check"></i>
+                  <div class="shield-glow"></div>
+              </div>
+          </div>
+        </div>
+        <!-- 2. Card Trạng thái thiết bị -->
+        <div class="device-status-card">
+          <div class="status-header">
+            <div class="dot-indicator offline" id="device-dot"></div>
+            <span>Trạng thái thiết bị</span>
+          </div>
+    
+          <div class="status-grid">
+            <!-- Kết nối mạng -->
+            <div class="status-item">
+              <div class="status-icon-box">
+                  <i class="fa-solid fa-wifi"></i>
+              </div>
+              <div class="status-info">
+                  <div class="label">Kết nối mạng</div>
+                  <div class="value" id="wifi-status">Đang tải...</div>
+                  <div class="status-sub">
+                    <span id="device-last-seen">--</span>
+                    <span class="sep">•</span>
+                    <span id="device-latency">--</span>
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="aq-card" id="card-pm25"></div>
+      <div class="aq-card" id="card-temp"></div>
+      <div class="aq-card" id="card-humi"></div>
+      <div class="aq-card" id="card-co2"></div>
+    </div>
+
+    
+
+    <div class="forecast-container card">
+      <h2 class="section-title">
+          <span class="title-badge">B</span>
+          DỰ BÁO THEO GIỜ (LSTM MODEL)
+      </h2>
+
+      <div class="forecast-scroll-wrapper">
+          <div id="forecast-list" class="forecast-list">
+              <div class="empty-state">--</div>
+          </div>
+      </div>
+      
+      <div id="system-analysis" class="system-analysis-box">
+        <span class="analysis-label">Phân tích hệ thống:</span>
+        <span id="analysis-text"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="history" class="tab-content" style="display:none">
+
+    <div class="header-new-container">
+      <div class="header-gradient-box">
+          <div class="header-left-content">
+              <div class="icon-bg-white">
+                  <i class="fas fa-chart-line"></i> </div>
+              <div class="header-text">
+                  <h1 class="main-title-text">LỊCH SỬ DỮ LIỆU VÀ BIỂU ĐỒ QUAN TRẮC</h1>
+                  <p class="sub-title-text">
+                      Theo dõi biến động các chỉ số môi trường theo thời gian thực
+                    </p>
+              </div>
+          </div>
+      </div>
+    </div>
+
+    <!-- 🔍 FILTER -->
+    <div class="filter-container">
+      <div class="filter-item">
+        <label>Từ ngày</label>
+        <input type="date" id="startDate">
+      </div>
+      
+      <div class="filter-separator">
+        <i class="fas fa-arrow-right"></i>
+      </div>
+
+      <div class="filter-item">
+        <label>Đến ngày</label>
+        <input type="date" id="endDate">
+      </div>
+
+      <div class="filter-actions">
+        <button class="btn-filter" onclick="applyFilter()">
+          <i class="fas fa-filter"></i> Lọc
+        </button>
+        <button class="btn-reset" onclick="resetFilter()">
+          <i class="fas fa-undo"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="chart-box">
+      <canvas id="historyChart"></canvas>
+    </div>
+
+    <!-- TABLE -->
+    <div class="card history-card">
+      <div class="card-header">
+        <div class="header-left">
+          <h3>📋 Bảng dữ liệu chi tiết</h3>
+        </div>
+        
+        <div class="header-right">
+          <!-- 1. Nhóm công cụ Admin (Bên trái) -->
+          <div class="admin-tools">
+            <select id="deleteType" onchange="toggleDateInput()">
+              <option value="all">Xóa tất cả</option>
+              <option value="day">Theo ngày</option>
+              <option value="month">Theo tháng</option>
+              <option value="year">Theo năm</option>
+            </select>
+            <input type="date" id="dateInput" style="display:none;">
+            <input type="month" id="monthInput" style="display:none;">
+            <input type="text" id="yearInput" placeholder="VD: 2026" style="display:none;">
+            <button class="btn-delete" onclick="handleDelete()"><i class="fa-solid fa-trash"></i> Xóa</button>
+          </div>
+
+          <!-- 2. Ô tìm kiếm (Ở giữa) -->
+          <div class="search-box">
+            <input 
+              type="text" 
+              id="searchInput" 
+              placeholder="Tìm dữ liệu..." 
+              oninput="handleSearch()"
+            >
+          </div>
+
+          <!-- 3. Nhóm xuất bản (Bên phải) -->
+          <div class="export-tools">
+            <button class="btn-export" onclick="exportXLSX()">📥 Excel</button>
+            <button class="btn-export csv" onclick="exportCSV_AI()">📄 CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Thời gian</th>
+              <th>PM2.5 (µg/m³)</th>
+              <th>Nhiệt độ (°C)</th>
+              <th>Độ ẩm (%)</th>
+              <th>CO2 (ppm)</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="history_table"></tbody>
+        </table>
+      </div>
+
+      <div class="table-footer">
+        <div class="pagination" id="pagination">
+          </div>
+      </div>
+    </div>
+  </div>
+  <!-- PREDICTION -->
+  <div id="prediction" class="tab-content" style="display:none">
+    <div class="header-new-container">
+      <div class="header-gradient-box">
+          <div class="header-left-content">
+              <div class="icon-bg-white">
+                  <i class="fas fa-chart-line"></i> </div>
+              <div class="header-text">
+                  <h1 class="main-title-text">DỰ ĐOÁN CHẤT LƯỢNG KHÔNG KHÍ (AI)</h1>
+                  <p class="sub-title-text">
+                      Sử dụng mô hình LSTM để dự đoán xu hướng chất lượng không khí trong 12 giờ tới
+                    </p>
+              </div>
+          </div>
+      </div>
+    </div>
+    <!-- AI SUMMARY -->
+    <div class="ai-banner">
+      <div class="ai-circle">
+        <img src="./img/anh_AI.png" alt="AI">
+      </div>
+      <div class="ai-text">
+        <h3 class="ai-title">AI dự đoán chất lượng không khí trong 12 giờ tới</h3>
+        <p id="ai-advice">
+          Đang tải dự đoán AI...
+        </p>
+      </div>
+    </div>
+
+    <!-- TOP CARDS -->
+    <div class="top-cards">
+      <div class="ai-card">
+        <span>PM2.5 dự đoán</span>
+        <h2 id="predict-pm25">--</h2>
+        <p id="predict-pm25-trend">--</p>
+      </div>
+      <div class="ai-card">
+        <span>Nhiệt độ dự đoán</span>
+        <h2 id="predict-temp">--</h2>
+        <p id="predict-temp-trend">--</p>
+      </div>
+      <div class="ai-card">
+        <span>Độ ẩm dự đoán</span>
+        <h2 id="predict-humi">--</h2>
+        <p id="predict-humi-trend">--</p>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="main-grid">
+      <!-- CHART -->
+      <div class="chart-panel">
+        <div class="panel-title">
+        Dự báo PM2.5 trong 12 giờ tới
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="predictChart"></canvas>
+        </div>
+        <div class="ai-forecast-badge">VÙNG DỰ BÁO AI</div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="table-panel">
+        <div class="panel-title">
+        Bảng dự báo
+        </div>
+        <div class="forecast-table-wrapper">
+          <table>
+            <thead>
+                <tr>
+                    <th>Giờ</th>
+                    <th>PM2.5</th>
+                    <th>Nhiệt độ</th>
+                    <th>Độ ẩm</th>
+                    <th>AQI</th>
+                </tr>
+            </thead>
+            <tbody id="forecast-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- LOGS -->
+  <div id="logs" class="tab-content" style="display:none">
+
+    <div class="header-new-container">
+      <div class="header-gradient-box">
+        <div class="header-left-content">
+          <div class="icon-bg-white">
+            <i class="fas fa-shield-alt"></i>
+          </div>
+          <div class="header-text">
+            <h1 class="main-title-text">NHẬT KÝ & CẢNH BÁO</h1>
+            <p class="sub-title-text">Theo dõi các sự kiện vượt ngưỡng và quản lý email</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-dashboard-layout">
+      
+      <div class="grid-column-left">
+        <h2 class="section-title">
+          <span class="title-badge">A</span> NHẬT KÝ CẢNH BÁO VƯỢT NGƯỠNG
+        </h2>
+        <div class="card">
+          <div class="log-header-flex responsive-flex-header">
+            <div class="log-action-buttons">
+              <button class="log-btn log-btn-clear" onclick="handleDeleteAlertLogs()">🗑️ Xóa</button>
+              <button class="log-btn log-btn-export" onclick="exportAlertLogs()">📂 Xuất</button>
+            </div>
+            <div class="log-filter-bar">
+              <input type="text" id="logSearchInput" placeholder="🔍 Tìm kiếm..." oninput="filterAlertLogs()">
+              <select id="logTypeFilter" onchange="filterAlertLogs()">
+                <option value="all">Tất cả</option>
+                <option value="PM2.5">PM2.5</option>
+                <option value="Gas">Gas</option>
+                <option value="Temp">Nhiệt độ</option>
+                <option value="Humi">Độ ẩm</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="status-legend-mobile">
+            <span class="legend-item">
+              <span class="dot dot-normal"></span>
+              Bình thường
+            </span>
+
+            <span class="legend-item">
+              <span class="dot dot-warn"></span>
+              Cảnh báo
+            </span>
+
+            <span class="legend-item">
+              <span class="dot dot-high"></span>
+              Nguy hiểm
+            </span>
+
+            <span class="legend-item">
+              <span class="dot dot-critical"></span>
+              Rất nguy hiểm
+            </span>
+          </div>
+
+          <div class="table-responsive" style="overflow-x: auto; -webkit-overflow-scrolling: touch;"> 
+            <table style="width: 100%; min-width: 600px;">
+              <thead>
+                <tr>
+                  <th>Thời gian</th>
+                  <th>Cảnh báo</th>
+                  <th>PM2.5</th>
+                  <th>Gas</th>
+                  <th>Nhiệt độ</th>
+                  <th>Độ ẩm</th>
+                  <th>Trạng thái</th>
+                  <th>Email</th>
+                </tr>
+              </thead>
+              <tbody id="alert_log_table"></tbody>
+            </table>
+          </div>
+
+          <div class="table-footer">
+            <div class="pagination" id="logPagination"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-column-right">
+        <h2 class="section-title">
+          <span class="title-badge">B</span> ĐĂNG KÝ EMAIL
+        </h2>
+        <div class="card email-card-custom">
+          <div class="email-box responsive-email-box">
+            <input type="email" id="emailInput" placeholder="Nhập email...">
+            <button id="btnAddEmail">
+              <i class="fas fa-paper-plane"></i>
+              <span>Đăng ký</span>
+            </button> 
+          </div>
+
+          <div class="table-container list-mode"> 
+            <table style="width: 100%;">
+              <thead>
+                <tr>
+                  <th>Email đăng ký</th>
+                  <th>Ngày đăng ký</th>
+                  <th style="text-align: center;">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="email_table"></tbody> 
+            </table>
+          </div> 
+
+          <div class="note-container" style="margin-top: 20px;">
+            <div class="note-icon">
+                <i class="fas fa-info-circle"></i>
+            </div>
+            <div class="note-content">
+                <h4>Lưu ý</h4>
+                <ul>
+                    <li>Email sẽ được gửi ngay khi hệ thống ghi nhận cảnh báo mới.</li>
+                    <li>Vui lòng kiểm tra hộp thư rác (Spam) nếu không thấy email.</li>
+                    <li>Bạn có thể thay đổi tùy chọn hoặc hủy đăng ký bất kỳ lúc nào.</li>
+                </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div> 
+  </div>
+  <!-- SETTINGS -->
+  <div id="settings" class="tab-content" style="display:none">
+
+    <div class="header-new-container">
+      <div class="header-gradient-box">
+        <div class="header-left-content">
+
+          <div class="icon-bg-white">
+            <i class="fas fa-cog"></i>
+          </div>
+
+          <div class="header-text">
+            <h1 class="main-title-text">CÀI ĐẶT CẢNH BÁO HỆ THỐNG</h1>
+
+            <p class="sub-title-text">
+              Quản lý ngưỡng an toàn và chế độ cảnh báo âm thanh
+            </p>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- CÒI CẢNH BÁO -->
+    <div class="card buzzer-card">
+
+      <div class="buzzer-info">
+
+        <div class="buzzer-icon">
+          <i class="fas fa-volume-high"></i>
+        </div>
+
+        <div class="buzzer-text">
+          <h3>Còi cảnh báo</h3>
+          <p>Bật âm thanh khi vượt ngưỡng nguy hiểm</p>
+        </div>
+
+      </div>
+
+      <label class="modern-switch">
+
+        <input
+          type="checkbox"
+          id="buzzerToggle"
+          checked
+        >
+
+        <span class="switch-track">
+
+          <span class="switch-thumb">
+            <i class="fas fa-volume-high"></i>
+          </span>
+
+        </span>
+
+      </label>
+
+    </div>
+
+    <!-- NGƯỠNG -->
+    <div class="card threshold-main-card">
+
+      <h3 class="threshold-section-title">⚙️ Ngưỡng cảnh báo</h3>
+
+      <div class="threshold-grid" id="thresholdGridContainer">
+        <div id="th-card-pm25"></div>
+        <div id="th-card-temp"></div>
+        <div id="th-card-humi"></div>
+        <div id="th-card-gas"></div>
+      </div>
+
+      <div class="threshold-action-row">
+        <button class="btn-edit-threshold" onclick="openThresholdPopup()">
+          ✏️ Sửa ngưỡng
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+// TAB SWITCH
+function showTab(tabId, el){
+  document.querySelectorAll(".tab-content").forEach(t=>{
+    t.style.display="none";
+  });
+
+  document.getElementById(tabId).style.display="block";
+
+  document.querySelectorAll(".menu").forEach(m=>{
+    m.classList.remove("active");
+  });
+
+  el.classList.add("active");
+
+  // Auto-close sidebar on mobile after selecting a tab
+  if (window.innerWidth <= 768) {
+    const sidebar = document.querySelector(".sidebar");
+    if (sidebar && sidebar.classList.contains("active")) {
+      sidebar.classList.remove("active");
+    }
+  }
+
+  // 🔥 FIX CHART RESIZE
+  if (tabId === "history" && window.historyChart) {
+    setTimeout(() => {
+      window.historyChart.resize();
+    }, 200);
+  }
+
+  if (tabId === "prediction" && window.predictChart) {
+    setTimeout(() => {
+      window.predictChart.resize();
+    }, 200);
+  }
+}
+</script>
+
+<script>
+function openThresholdPopup() {
+  document.getElementById("thresholdPopup").style.display = "flex";
+}
+
+function closeThresholdPopup() {
+  document.getElementById("thresholdPopup").style.display = "none";
+}
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<script>
+  emailjs.init("7Ji3qP1XgtnK0qdy4");
+</script>
+<script type="module" src="app.js?v=1.1"></script>
+
+<script>
+  function handleSearch() {
+    // 1. Lấy giá trị từ ô input và chuyển về chữ thường
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toLowerCase();
+    
+    // 2. Truy cập vào bảng và các hàng dữ liệu
+    const table = document.getElementById("history_table");
+    const tr = table.getElementsByTagName("tr");
+
+    // 3. Lặp qua tất cả các hàng để kiểm tra dữ liệu
+    for (let i = 0; i < tr.length; i++) {
+      let rowVisible = false;
+      const td = tr[i].getElementsByTagName("td");
+
+      // Kiểm tra tất cả các cột trong hàng (trừ cột "Thao tác" cuối cùng)
+      for (let j = 0; j < td.length - 1; j++) {
+        if (td[j]) {
+          const txtValue = td[j].textContent || td[j].innerText;
+          if (txtValue.toLowerCase().indexOf(filter) > -1) {
+            rowVisible = true;
+            break; // Nếu tìm thấy ở 1 cột, không cần kiểm tra các cột khác của hàng đó
+          }
+        }
+      }
+
+      // 4. Hiển thị hoặc ẩn hàng dựa trên kết quả tìm kiếm
+      tr[i].style.display = rowVisible ? "" : "none";
+    }
+  }
+</script>
+
+<!-- POPUP SỬA NGƯỠNG -->
+<div id="thresholdPopup" class="popup" style="display:none;">
+  <div class="popup-content">
+
+    <div class="popup-header">
+      <h3>Cài đặt ngưỡng</h3>
+      <span class="close-btn" onclick="closeThresholdPopup()">✖</span>
+    </div>
+
+    <div class="popup-body">
+
+      <div class="input-group">
+        <label>PM2.5</label>
+        <input type="number" id="th-pm25-input">
+      </div>
+
+      <div class="input-group">
+        <label>Nhiệt độ</label>
+        <input type="number" id="th-temp-input">
+      </div>
+
+      <div class="input-group">
+        <label>Độ ẩm</label>
+        <input type="number" id="th-humi-input">
+      </div>
+
+      <div class="input-group">
+        <label>Gas</label>
+        <input type="number" id="th-gas-input">
+      </div>
+
+    </div>
+
+    <div class="popup-footer">
+      <button class="btn-save" onclick="saveThreshold()">Lưu</button>
+      <button class="btn-cancel" onclick="closeThresholdPopup()">Hủy</button>
+    </div>
+
+  </div>
+</div>
+<!-- POPUP XÁC NHẬN XÓA HAY KHÔNG -->
+ <div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>⚠️ Xác nhận xóa dữ liệu</h3>
+      </div>
+      <div class="modal-body">
+        <p id="confirmMessage">Bạn có chắc chắn muốn xóa dữ liệu này không? Hành động này không thể hoàn tác.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeConfirmModal()">Hủy bỏ</button>
+        <button class="btn-danger" id="btnConfirmAction">Đồng ý xóa</button>
+      </div>
+    </div>
+  </div>
+  
+</body>
+</html>
