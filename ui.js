@@ -49,13 +49,14 @@ function calculateAQI(pm25) {
     return 0;
   }
 
+  // VN_AQI chuẩn (EPA breakpoint)
   const breakpoints = [
-    { bpLow: 0,   bpHigh: 25,  iLow: 0,   iHigh: 50 },
-    { bpLow: 25,  bpHigh: 50,  iLow: 51,  iHigh: 100 },
-    { bpLow: 50,  bpHigh: 80,  iLow: 101, iHigh: 150 },
-    { bpLow: 80,  bpHigh: 150, iLow: 151, iHigh: 200 },
-    { bpLow: 150, bpHigh: 250, iLow: 201, iHigh: 300 },
-    { bpLow: 250, bpHigh: 500, iLow: 301, iHigh: 500 }
+    { bpLow: 0.0,   bpHigh: 12.0,   iLow: 0,   iHigh: 50 },
+    { bpLow: 12.1,  bpHigh: 35.4,   iLow: 51,  iHigh: 100 },
+    { bpLow: 35.5,  bpHigh: 55.4,   iLow: 101, iHigh: 150 },
+    { bpLow: 55.5,  bpHigh: 150.4,  iLow: 151, iHigh: 200 },
+    { bpLow: 150.5, bpHigh: 250.4,  iLow: 201, iHigh: 300 },
+    { bpLow: 250.5, bpHigh: 500.4,  iLow: 301, iHigh: 500 }
   ];
 
   for (const bp of breakpoints) {
