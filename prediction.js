@@ -23,13 +23,17 @@ function renderPredictionCards(data) {
 
   if (pmCard) {
 
-    const percent = Number(data.pm25_percent || 0);
+    const change = Number(data.pm25_change || 0);
 
     pmCard.querySelector("h2").innerText =
       `${Number(data.pm25 || 0).toFixed(1)} µg/m³`;
 
     pmCard.querySelector("p").innerText =
-      `${getTrendIcon(data.pm25_trend)} ${Math.abs(percent).toFixed(1)}% so với hiện tại`;
+      getTrendText(
+        data.pm25_trend,
+        change,
+        " µg/m³"
+      );
   }
 
   // ===== TEMP =====
@@ -37,13 +41,13 @@ function renderPredictionCards(data) {
 
   if (tempCard) {
 
-    const percent = Number(data.temp_percent || 0);
+    const change = Number(data.temp_change || 0);
 
     tempCard.querySelector("h2").innerText =
       `${Number(data.temp || 0).toFixed(1)}°C`;
 
     tempCard.querySelector("p").innerText =
-      `${getTrendText(data.temp_trend, percent)}`;
+      `${getTrendText(data.temp_trend, change, "°C")}`;
   }
 
   // ===== HUMI =====
@@ -51,13 +55,13 @@ function renderPredictionCards(data) {
 
   if (humiCard) {
 
-    const percent = Number(data.humi_percent || 0);
+    const change = Number(data.humi_change || 0);
 
     humiCard.querySelector("h2").innerText =
       `${Number(data.humi || 0).toFixed(1)}%`;
 
     humiCard.querySelector("p").innerText =
-      `${getTrendText(data.humi_trend, percent)}`;
+      `${getTrendText(data.humi_trend, change, "%")}`;
   }
 }
 
@@ -71,17 +75,19 @@ function getTrendIcon(trend) {
   return "•";
 }
 
-function getTrendText(trend, percent) {
+function getTrendText(trend, change, unit = "") {
+
+  const value = Math.abs(change).toFixed(1);
 
   if (trend === "tăng") {
-    return `↑ ${Math.abs(percent).toFixed(1)}% tăng nhẹ`;
+    return `↑ ${value}${unit} tăng`;
   }
 
   if (trend === "giảm") {
-    return `↓ ${Math.abs(percent).toFixed(1)}% giảm nhẹ`;
+    return `↓ ${value}${unit} giảm`;
   }
 
-  return "Ổn định";
+  return "• Ổn định";
 }
 
 function renderPredictionAdvice(data) {

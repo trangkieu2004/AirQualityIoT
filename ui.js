@@ -1,4 +1,4 @@
-let currentHistoryData = []; // Lưu trữ dữ liệu gốc sau khi đã sort
+export let currentHistoryData = []; // Lưu trữ dữ liệu gốc sau khi đã sort
 let currentPage = 1;
 const rowsPerPage = 10; // Số dòng mỗi trang
 
@@ -44,23 +44,67 @@ export function createCard(title, value, unit, max, iconClass, iconBg,baseColor)
 /* ================= AQI ================= */
 
 function calculateAQI(pm25) {
-  let aqi = 0;
-  if (pm25 <= 12) {
-    aqi = (pm25 / 12) * 50;
-  } else if (pm25 <= 35.4) {
-    aqi = ((pm25 - 12) / 23.4) * 50 + 50;
-  } else if (pm25 <= 55.4) {
-    aqi = ((pm25 - 35.4) / 20) * 50 + 100;
-  } else if (pm25 <= 150.4) {
-    aqi = ((pm25 - 55.4) / 95) * 50 + 150;
-  } else if (pm25 <= 250.4) { // Mốc Rất xấu
-    aqi = ((pm25 - 150.4) / 100) * 100 + 200;
-  } else if (pm25 <= 500.4) { // Mốc Nguy hại
-    aqi = ((pm25 - 250.4) / 250) * 200 + 300;
-  } else {
-    aqi = 500;
+
+  if (pm25 == null || isNaN(pm25)) {
+    return 0;
   }
-  return Math.round(aqi);
+
+  const breakpoints = [
+    { bpLow: 0,   bpHigh: 25,  iLow: 0,   iHigh: 50 },
+    { bpLow: 25,  bpHigh: 50,  iLow: 51,  iHigh: 100 },
+    { bpLow: 50,  bpHigh: 80,  iLow: 101, iHigh: 150 },
+    { bpLow: 80,  bpHigh: 150, iLow: 151, iHigh: 200 },
+    { bpLow: 150, bpHigh: 250, iLow: 201, iHigh: 300 },
+    { bpLow: 250, bpHigh: 500, iLow: 301, iHigh: 500 }
+  ];
+
+  for (const bp of breakpoints) {
+
+    if (pm25 <= bp.bpHigh) {
+
+      const aqi =
+        ((bp.iHigh - bp.iLow) /
+        (bp.bpHigh - bp.bpLow)) *
+        (pm25 - bp.bpLow) +
+        bp.iLow;
+
+      return Math.round(aqi);
+    }
+  }
+
+  return 500;
+}
+export function calculateNowCast(history) {
+
+  if (!history || history.length === 0) return null;
+
+  const values = history
+    .slice(0, 12)
+    .map(v => Number(v))
+    .filter(v => !isNaN(v));
+
+  if (values.length === 0) return null;
+
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+
+  let w = min / max;
+
+  if (w < 0.5) w = 0.5;
+
+  let numerator = 0;
+  let denominator = 0;
+
+  values.forEach((c, i) => {
+
+    const weight = Math.pow(w, i);
+
+    numerator += c * weight;
+    denominator += weight;
+
+  });
+
+  return +(numerator / denominator).toFixed(1);
 }
 
 function getAQIInfo(aqi) {
@@ -174,7 +218,7 @@ export function renderAQI(pm25) {
           <div class="aqi-subtitle">CHỈ SỐ CHẤT LƯỢNG KHÔNG KHÍ</div>
         </div>
       </div>
-      <div class="aqi-badge">US AQI</div>
+      <div class="aqi-badge">VN AQI • NOWCAST</div>
     </div>
 
     <div class="aqi-main">

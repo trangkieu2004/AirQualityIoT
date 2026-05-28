@@ -1,37 +1,6 @@
 import { db } from "./firebase_config.js";
 import { ref, onValue } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
-// ================= PM2.5 -> AQI =================
-function pm25ToAQI(pm25) {
-  if (pm25 <= 12) {
-    return calcAQI(pm25, 0, 12, 0, 50);
-  }
-  else if (pm25 <= 35.4) {
-    return calcAQI(pm25, 12.1, 35.4, 51, 100);
-  }
-  else if (pm25 <= 55.4) {
-    return calcAQI(pm25, 35.5, 55.4, 101, 150);
-  }
-  else if (pm25 <= 150.4) {
-    return calcAQI(pm25, 55.5, 150.4, 151, 200);
-  }
-  else if (pm25 <= 250.4) {
-    return calcAQI(pm25, 150.5, 250.4, 201, 300);
-  }
-  else {
-    return 300;
-  }
-}
-// ================= AQI FORMULA =================
-function calcAQI(Cp, Clow, Chigh, Ilow, Ihigh) {
-
-  return Math.round(
-    ((Ihigh - Ilow) / (Chigh - Clow)) *
-    (Cp - Clow) +
-    Ilow
-  );
-}
-
 // ================= AQI CLASS =================
 function getAQIClass(aqi) {
 
@@ -64,18 +33,26 @@ function getAQIClass(aqi) {
 
 // ================= INIT AI =================
 export function initAI() {
+
   const aiRef = ref(db, "forecast");
 
   onValue(aiRef, (snapshot) => {
+
     const raw = snapshot.val();
+
     const data = Object.values(raw || {});
 
-    const container = document.getElementById("forecast-list");
-    const analysisEl = document.getElementById("analysis-text");
+    const container =
+      document.getElementById("forecast-list");
+
+    const analysisEl =
+      document.getElementById("analysis-text");
 
     // ================= NO DATA =================
     if (!data || data.length === 0) {
+
       renderEmpty(container, analysisEl);
+
       return;
     }
 
@@ -84,8 +61,6 @@ export function initAI() {
       .slice(0, 12)
       .map(item => {
 
-        const pm25 = Number(item.pm25 || 0);
-
         return {
 
           time: new Date(item.time).toLocaleTimeString([], {
@@ -93,24 +68,37 @@ export function initAI() {
             minute: "2-digit"
           }),
 
-          pm25: pm25,
-          aqi: pm25ToAQI(pm25),
-          temp: item.temp,
-          humi: item.humi
+          // ================= PM2.5 =================
+          pm25: Number(item.pm25 || 0),
+
+          // ================= VN_AQI =================
+          aqi: Number(item.vn_aqi || 0),
+
+          // ================= NOWCAST =================
+          nowcast: Number(item.nowcast_pm25 || 0),
+
+          // ================= WEATHER =================
+          temp: Number(item.temp || 0),
+          humi: Number(item.humi || 0)
         };
       });
+
     // ================= RENDER =================
     renderForecast(container, forecastData);
+
     renderAnalysis(analysisEl, forecastData);
   });
 }
 
 // ================= EMPTY STATE =================
 function renderEmpty(container, analysisEl) {
+
   if (container) {
+
     let html = "";
 
     for (let i = 0; i < 12; i++) {
+
       html += `
         <div class="forecast-item">
           <div>--:--</div>
@@ -126,26 +114,44 @@ function renderEmpty(container, analysisEl) {
   }
 
   if (analysisEl) {
-    analysisEl.innerText = "Chưa có dữ liệu dự báo AI 12 giờ tới...";
+
+    analysisEl.innerText =
+      "Chưa có dữ liệu dự báo AI 12 giờ tới...";
   }
 }
 
 // ================= RENDER FORECAST =================
 function renderForecast(container, data) {
+
   if (!container) return;
 
   let html = "";
 
   data.forEach(item => {
+
     const aqiClass = getAQIClass(item.aqi);
 
     html += `
       <div class="forecast-item">
+
         <div>${item.time}</div>
-        <div class="aqi-box ${aqiClass}">${item.aqi}</div>
-        <div class="forecast-value">PM: ${item.pm25}</div>
-        <div class="forecast-value">${item.temp}°C</div>
-        <div class="forecast-value">${item.humi}%</div>
+
+        <div class="aqi-box ${aqiClass}">
+          ${item.aqi}
+        </div>
+
+        <div class="forecast-value">
+          PM: ${item.pm25}
+        </div>
+
+        <div class="forecast-value">
+          ${item.temp}°C
+        </div>
+
+        <div class="forecast-value">
+          ${item.humi}%
+        </div>
+
       </div>
     `;
   });
@@ -155,29 +161,62 @@ function renderForecast(container, data) {
 
 // ================= AI ANALYSIS =================
 function renderAnalysis(el, data) {
+
   if (!el || !data || data.length < 2) {
-    if (el) el.innerText = "Chưa đủ dữ liệu để phân tích AI.";
+
+    if (el) {
+
+      el.innerText =
+        "Chưa đủ dữ liệu để phân tích AI.";
+    }
+
     return;
   }
 
   const valid = data.slice(0, 12);
 
   // ================= METRICS =================
-  const maxAQI = Math.max(...valid.map(d => d.aqi));
-  const maxItem = valid.find(d => d.aqi === maxAQI);
-  const maxHumi = Math.max(...valid.map(d => d.humi));
+  const maxAQI =
+    Math.max(...valid.map(d => d.aqi));
+
+  const maxItem =
+    valid.find(d => d.aqi === maxAQI);
+
+  const maxHumi =
+    Math.max(...valid.map(d => d.humi));
+
+  const avgPM25 =
+    (
+      valid.reduce((sum, d) => sum + d.pm25, 0)
+      / valid.length
+    ).toFixed(1);
 
   // ================= TREND =================
   const start = valid[0].aqi;
-  const end = valid[valid.length - 1].aqi;
+
+  const end =
+    valid[valid.length - 1].aqi;
+
   const trend = end - start;
+
   let trendText = "";
+
   if (trend > 20) {
-    trendText = "có xu hướng xấu dần";
-  } else if (trend < -20) {
-    trendText = "đang cải thiện";
-  } else {
-    trendText = "tương đối ổn định";
+
+    trendText =
+      "có xu hướng xấu dần";
+
+  }
+  else if (trend < -20) {
+
+    trendText =
+      "đang cải thiện";
+
+  }
+  else {
+
+    trendText =
+      "tương đối ổn định";
   }
 
   // ================= AQI ANALYSIS =================
@@ -186,37 +225,37 @@ function renderAnalysis(el, data) {
   if (maxAQI <= 50) {
 
     aqiText =
-      `Chất lượng không khí tốt (AQI ${maxAQI}).`;
+      `Chất lượng không khí tốt (VN_AQI ${maxAQI}).`;
 
   }
   else if (maxAQI <= 100) {
 
     aqiText =
-      `Chất lượng không khí ở mức trung bình (AQI ${maxAQI}).`;
+      `Chất lượng không khí ở mức trung bình (VN_AQI ${maxAQI}).`;
 
   }
   else if (maxAQI <= 150) {
 
     aqiText =
-      `Không khí ở mức kém (AQI ${maxAQI}).`;
+      `Không khí ở mức kém (VN_AQI ${maxAQI}).`;
 
   }
   else if (maxAQI <= 200) {
 
     aqiText =
-      `Không khí ở mức xấu (AQI ${maxAQI}).`;
+      `Không khí ở mức xấu (VN_AQI ${maxAQI}).`;
 
   }
   else if (maxAQI <= 300) {
 
     aqiText =
-      `Không khí rất xấu (AQI ${maxAQI}).`;
+      `Không khí rất xấu (VN_AQI ${maxAQI}).`;
 
   }
   else {
 
     aqiText =
-      `Không khí nguy hại (AQI ${maxAQI}).`;
+      `Không khí nguy hại (VN_AQI ${maxAQI}).`;
   }
 
   // ================= HUMIDITY =================
@@ -225,33 +264,47 @@ function renderAnalysis(el, data) {
   if (maxHumi > 80) {
 
     humiText =
-      `Độ ẩm cao có thể gây khó chịu.`;
+      " Độ ẩm cao có thể gây cảm giác oi bức và khó chịu.";
   }
 
-  // ================= TIME CONTEXT =================
-  const lastHour = parseInt(valid[valid.length - 1].time.split(":")[0]);
+  // ================= PEAK TIME =================
+  let peakText = "";
 
-  let timeText = "";
-  if (lastHour >= 18) {
-    timeText = "Buổi tối có xu hướng ô nhiễm tăng nhẹ.";
-  } else if (lastHour <= 6) {
-    timeText = "Buổi sáng không khí ổn định.";
+  if (maxItem) {
+
+    peakText =
+      ` Mức ô nhiễm cao nhất dự kiến vào khoảng ${maxItem.time}.`;
+  }
+
+  // ================= HEALTH ADVICE =================
+  let adviceText = "";
+
+  if (maxAQI > 150) {
+
+    adviceText =
+      " Khuyến nghị hạn chế hoạt động ngoài trời và nên đeo khẩu trang chống bụi mịn.";
+
+  }
+  else if (maxAQI > 100) {
+
+    adviceText =
+      " Nhóm nhạy cảm nên hạn chế vận động mạnh ngoài trời.";
+
+  }
+  else {
+
+    adviceText =
+      " Điều kiện không khí tương đối an toàn cho sinh hoạt.";
   }
 
   // ================= FINAL TEXT =================
   let text =
-    `AI dự báo 12 giờ tới: Không khí ${trendText}. ${aqiText}`;
-
-  if (humiText) {
-
-    text += " " + humiText;
-  }
-
-  if (maxAQI > 150) {
-
-    text +=
-      " Khuyến nghị hạn chế hoạt động ngoài trời.";
-  }
+    `AI dự báo 12 giờ tới: Không khí ${trendText}. `
+    + `${aqiText} `
+    + `PM2.5 trung bình khoảng ${avgPM25} µg/m³.`
+    + peakText
+    + humiText
+    + adviceText;
 
   el.innerText = text;
 }
