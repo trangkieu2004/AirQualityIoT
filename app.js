@@ -1,7 +1,7 @@
 import { initCharts, updateCharts } from "./charts.js";
 import { db, ref, set, get, remove, update, push } from "./firebase_config.js";
 import { listenCurrent, listenHistory, listenThreshold, listenForecast } from "./data.js";
-import { renderCards, renderTable, renderAQI, renderThreshold } from "./ui.js";
+import { renderCards, renderTable, renderAQI, renderThreshold, currentHistoryData,calculateNowCast } from "./ui.js";
 import { initAlertEmailListener, resendAllEmails } from "./email.js";
 import { addSubscriber, loadSubscribers, renderSubscribers, deleteSubscriber, editSubscriber, subscribers } from "./subscriber.js";
 import { loadAlertLogs, renderAlertLogs, alertLogs, fixOldAlertData, setFilteredLogs, resetLogPage } from "./logs.js";
@@ -290,8 +290,14 @@ listenCurrent((current) => {
   // 🔥 WIFI
   updateWifiStatus(current);
 
-  // 🔥 AQI + CARD
-  renderAQI(current.pm25);
+  const historyPM25 = currentHistoryData?.map(h => h.pm25) || [];
+
+  const nowCastPM25 = calculateNowCast(historyPM25);
+
+  // Nếu chưa đủ dữ liệu history
+  const finalPM25 = nowCastPM25 ?? current.pm25;
+
+  renderAQI(finalPM25);
 
   if (latestThreshold) {
     renderCards(latestData, latestThreshold);
